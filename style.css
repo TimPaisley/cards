@@ -97,14 +97,6 @@ body {
     align-items: stretch;
 }
 
-.team .card {
-    cursor: pointer;
-}
-
-.team .card:hover {
-    border-color: #4d4d4d;
-}
-
 /* CARDS */
 
 .card {
@@ -118,6 +110,16 @@ body {
     margin: 5px;
     position: relative;
     user-select: none;
+    opacity: 0.5;
+}
+
+.card.active {
+    cursor: pointer;
+    opacity: 1;
+}
+
+.card.active:hover {
+    border-color: #4d4d4d;
 }
 
 .card .card-attack {
@@ -130,4 +132,14 @@ body {
     position: absolute;
     bottom: 5px;
     right: 5px;
+}
+
+.empty {
+    flex: 1 0 21%;
+    height: 90px;
+    border: 1px dashed #ccc;
+    border-radius: 5px;
+    margin: 5px;
+    position: relative;
+    user-select: none;
 }

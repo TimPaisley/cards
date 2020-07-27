@@ -56,13 +56,10 @@ emptyModel =
 
 init : Maybe Model -> ( Model, Cmd Msg )
 init maybeModel =
-    ( Maybe.withDefault emptyModel maybeModel
-    , Cmd.batch
-        [ Random.list 20 (Random.int 0 2)
-            |> Random.generate UpdateQueue
-        , Random.list 4 (Random.int 0 2)
-            |> Random.generate UpdateTeam
-        ]
+    ( emptyModel
+      -- Maybe.withDefault emptyModel maybeModel
+    , Random.list 20 (Random.int 0 2)
+        |> Random.generate UpdateQueue
     )
 
 
@@ -73,7 +70,6 @@ init maybeModel =
 type Msg
     = NoOp
     | UpdateQueue (List Int)
-    | UpdateTeam (List Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -84,11 +80,6 @@ update msg model =
 
         UpdateQueue cardIDs ->
             ( { model | queue = getCards cardIDs }
-            , Cmd.none
-            )
-
-        UpdateTeam cardIDs ->
-            ( { model | team = getCards cardIDs }
             , Cmd.none
             )
 
@@ -124,7 +115,7 @@ viewQueue : List Card -> Html Msg
 viewQueue queue =
     div
         [ class "queue" ]
-        (List.map viewCard <| List.take 16 queue)
+        (List.indexedMap viewCard <| List.take 16 queue)
 
 
 
@@ -143,16 +134,19 @@ viewHero =
 
 viewTeam : List Card -> Html Msg
 viewTeam team =
-    div
-        [ class "team" ]
-        (List.map viewCard team)
+    div [ class "team" ] (List.repeat 4 viewEmpty)
 
 
-viewCard : Card -> Html Msg
-viewCard card =
+viewCard : Int -> Card -> Html Msg
+viewCard index card =
     div
-        [ class "card" ]
+        [ classList [ ( "card", True ), ( "active", index > 11 ) ] ]
         [ div [ class "card-name" ] [ text card.name ]
         , div [ class "card-attack" ] [ text <| String.fromInt card.attack ]
         , div [ class "card-energy" ] [ text <| String.fromInt card.energy ]
         ]
+
+
+viewEmpty : Html Msg
+viewEmpty =
+    div [ class "empty" ] []
