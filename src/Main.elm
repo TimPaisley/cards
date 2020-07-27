@@ -2,18 +2,20 @@ port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, u
 
 import Browser
 import Browser.Dom as Dom
-import Cards exposing (Card, getCards)
+import Cards exposing (Card, getCard)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed as Keyed
 import Html.Lazy exposing (lazy, lazy2)
-import Json.Decode as Json
+import Html5.DragDrop
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Random
 import Task
 
 
-main : Program (Maybe Model) Model Msg
+main : Program Encode.Value Model Msg
 main =
     Browser.document
         { init = init
@@ -23,7 +25,7 @@ main =
         }
 
 
-port setStorage : Model -> Cmd msg
+port setStorage : Encode.Value -> Cmd msg
 
 
 updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
@@ -32,9 +34,14 @@ updateWithStorage msg model =
         ( newModel, cmds ) =
             update msg model
     in
-    ( newModel
-    , Cmd.batch [ setStorage newModel, cmds ]
-    )
+    case msg of
+        ResetModel ->
+            ( newModel, cmds )
+
+        _ ->
+            ( newModel
+            , Cmd.batch [ setStorage (encode newModel), cmds ]
+            )
 
 
 
@@ -42,8 +49,9 @@ updateWithStorage msg model =
 
 
 type alias Model =
-    { queue : List Card
-    , team : List Card
+    { queue : List Int
+    , team : List Int
+    , cardDragDrop : CardDragDrop
     }
 
 
@@ -51,16 +59,37 @@ emptyModel : Model
 emptyModel =
     { queue = []
     , team = []
+    , cardDragDrop = emptyCardDragDrop
     }
 
 
-init : Maybe Model -> ( Model, Cmd Msg )
-init maybeModel =
-    ( emptyModel
-      -- Maybe.withDefault emptyModel maybeModel
-    , Random.list 20 (Random.int 0 2)
+generateRandomQueue : Cmd Msg
+generateRandomQueue =
+    Random.list 20 (Random.int 0 2)
         |> Random.generate UpdateQueue
-    )
+
+
+type alias CardDragDrop =
+    { dragDrop : Html5.DragDrop.Model Card ( Int, Int )
+    , hoverPos : Maybe ( Int, Int )
+    }
+
+
+emptyCardDragDrop : CardDragDrop
+emptyCardDragDrop =
+    { dragDrop = Html5.DragDrop.init
+    , hoverPos = Nothing
+    }
+
+
+init : Encode.Value -> ( Model, Cmd Msg )
+init flags =
+    case Decode.decodeValue decoder flags of
+        Ok model ->
+            ( model, Cmd.none )
+
+        Err _ ->
+            ( emptyModel, generateRandomQueue )
 
 
 
@@ -69,6 +98,7 @@ init maybeModel =
 
 type Msg
     = NoOp
+    | ResetModel
     | UpdateQueue (List Int)
 
 
@@ -78,8 +108,11 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        ResetModel ->
+            ( emptyModel, generateRandomQueue )
+
         UpdateQueue cardIDs ->
-            ( { model | queue = getCards cardIDs }
+            ( { model | queue = cardIDs }
             , Cmd.none
             )
 
@@ -106,12 +139,13 @@ viewHeader : Html Msg
 viewHeader =
     div
         [ class "header" ]
-        [ div [ class "header-title" ] [ text "Cards" ]
-        , div [ class "header-subtitle" ] [ text "Build Phase" ]
+        [ div [] [ text "Cards" ]
+        , div [] [ text "Build Phase" ]
+        , div [ onClick ResetModel ] [ text "Reset" ]
         ]
 
 
-viewQueue : List Card -> Html Msg
+viewQueue : List Int -> Html Msg
 viewQueue queue =
     div
         [ class "queue" ]
@@ -132,13 +166,17 @@ viewHero =
         ]
 
 
-viewTeam : List Card -> Html Msg
+viewTeam : List Int -> Html Msg
 viewTeam team =
     div [ class "team" ] (List.repeat 4 viewEmpty)
 
 
-viewCard : Int -> Card -> Html Msg
-viewCard index card =
+viewCard : Int -> Int -> Html Msg
+viewCard index cardID =
+    let
+        card =
+            getCard cardID
+    in
     div
         [ classList [ ( "card", True ), ( "active", index > 11 ) ] ]
         [ div [ class "card-name" ] [ text card.name ]
@@ -150,3 +188,23 @@ viewCard index card =
 viewEmpty : Html Msg
 viewEmpty =
     div [ class "empty" ] []
+
+
+
+-- ENCODE/DECODE
+
+
+encode : Model -> Encode.Value
+encode model =
+    Encode.object
+        [ ( "queue", Encode.list Encode.int model.queue )
+        , ( "team", Encode.list Encode.int model.team )
+        ]
+
+
+decoder : Decode.Decoder Model
+decoder =
+    Decode.map3 Model
+        (Decode.field "queue" <| Decode.list Decode.int)
+        (Decode.field "team" <| Decode.list Decode.int)
+        (Decode.succeed emptyCardDragDrop)

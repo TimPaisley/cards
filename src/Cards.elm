@@ -1,4 +1,4 @@
-module Cards exposing (Card, getCards)
+module Cards exposing (Card, getCard)
 
 import Dict exposing (Dict)
 
@@ -10,18 +10,14 @@ type alias Card =
     }
 
 
-getCards : List Int -> List Card
-getCards cardIDs =
-    let
-        getCard i =
-            case Dict.get i deck of
-                Just card ->
-                    card
+getCard : Int -> Card
+getCard id =
+    case Dict.get id deck of
+        Just card ->
+            card
 
-                Nothing ->
-                    squid
-    in
-    List.map getCard cardIDs
+        Nothing ->
+            squid
 
 
 deck : Dict Int Card
