@@ -1,18 +1,18 @@
 port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, update, updateWithStorage, view, viewCard, viewHero, viewQueue, viewTeam)
 
 import Browser
-import Browser.Dom as Dom
-import Cards exposing (Card, getCard)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Html.Keyed as Keyed
-import Html.Lazy exposing (lazy, lazy2)
+import Cards exposing (getCard)
+import Dict exposing (Dict)
+import Html exposing (Html, div, text)
+import Html.Attributes exposing (class, classList)
+import Html.Events exposing (onClick)
+import Html.Lazy exposing (lazy)
 import Html5.DragDrop
 import Json.Decode as Decode
+import Json.Decode.Extra as DecodeX
 import Json.Encode as Encode
+import Json.Encode.Extra as EncodeX
 import Random
-import Task
 
 
 main : Program Encode.Value Model Msg
@@ -50,7 +50,7 @@ updateWithStorage msg model =
 
 type alias Model =
     { queue : List Int
-    , team : List Int
+    , team : Dict Int (Maybe Int)
     , cardDragDrop : CardDragDrop
     }
 
@@ -58,7 +58,7 @@ type alias Model =
 emptyModel : Model
 emptyModel =
     { queue = []
-    , team = []
+    , team = Dict.fromList [ ( 1, Nothing ), ( 2, Nothing ), ( 3, Nothing ), ( 4, Nothing ) ]
     , cardDragDrop = emptyCardDragDrop
     }
 
@@ -70,8 +70,8 @@ generateRandomQueue =
 
 
 type alias CardDragDrop =
-    { dragDrop : Html5.DragDrop.Model Card ( Int, Int )
-    , hoverPos : Maybe ( Int, Int )
+    { dragDrop : Html5.DragDrop.Model Int Int
+    , hoverPos : Maybe Int
     }
 
 
@@ -100,6 +100,7 @@ type Msg
     = NoOp
     | ResetModel
     | UpdateQueue (List Int)
+    | DragDropMsg (Html5.DragDrop.Msg Int Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -113,6 +114,37 @@ update msg model =
 
         UpdateQueue cardIDs ->
             ( { model | queue = cardIDs }
+            , Cmd.none
+            )
+
+        DragDropMsg msg_ ->
+            let
+                ( newDragDrop, result ) =
+                    Html5.DragDrop.update msg_ model.cardDragDrop.dragDrop
+
+                dragId =
+                    Html5.DragDrop.getDragId newDragDrop
+
+                dropId =
+                    Html5.DragDrop.getDropId newDragDrop
+
+                newCardDragDrop =
+                    case ( dragId, dropId ) of
+                        ( Just _, _ ) ->
+                            { dragDrop = newDragDrop, hoverPos = dropId }
+
+                        _ ->
+                            model.cardDragDrop
+
+                ( newQueue, newTeam ) =
+                    case result of
+                        Just ( card, slot, _ ) ->
+                            ( model.queue, Dict.insert slot (Just card) model.team )
+
+                        Nothing ->
+                            ( model.queue, model.team )
+            in
+            ( { model | cardDragDrop = newCardDragDrop, queue = newQueue, team = newTeam }
             , Cmd.none
             )
 
@@ -166,9 +198,9 @@ viewHero =
         ]
 
 
-viewTeam : List Int -> Html Msg
+viewTeam : Dict Int (Maybe Int) -> Html Msg
 viewTeam team =
-    div [ class "team" ] (List.repeat 4 viewEmpty)
+    div [ class "team" ] (Dict.toList team |> List.map viewSlot)
 
 
 viewCard : Int -> Int -> Html Msg
@@ -178,16 +210,27 @@ viewCard index cardID =
             getCard cardID
     in
     div
-        [ classList [ ( "card", True ), ( "active", index > 11 ) ] ]
+        (classList [ ( "card", True ), ( "active", index > 11 ) ] :: Html5.DragDrop.draggable DragDropMsg cardID)
         [ div [ class "card-name" ] [ text card.name ]
         , div [ class "card-attack" ] [ text <| String.fromInt card.attack ]
         , div [ class "card-energy" ] [ text <| String.fromInt card.energy ]
         ]
 
 
-viewEmpty : Html Msg
-viewEmpty =
-    div [ class "empty" ] []
+viewSlot : ( Int, Maybe Int ) -> Html Msg
+viewSlot ( slot, card ) =
+    let
+        cardDiv =
+            case card of
+                Just c ->
+                    [ viewCard 12 c ]
+
+                Nothing ->
+                    []
+    in
+    div
+        (class "slot" :: Html5.DragDrop.droppable DragDropMsg slot)
+        cardDiv
 
 
 
@@ -198,7 +241,7 @@ encode : Model -> Encode.Value
 encode model =
     Encode.object
         [ ( "queue", Encode.list Encode.int model.queue )
-        , ( "team", Encode.list Encode.int model.team )
+        , ( "team", Encode.dict (\i -> String.fromInt i) (EncodeX.maybe Encode.int) model.team )
         ]
 
 
@@ -206,5 +249,5 @@ decoder : Decode.Decoder Model
 decoder =
     Decode.map3 Model
         (Decode.field "queue" <| Decode.list Decode.int)
-        (Decode.field "team" <| Decode.list Decode.int)
+        (Decode.field "team" <| DecodeX.dict2 Decode.int <| Decode.nullable Decode.int)
         (Decode.succeed emptyCardDragDrop)

@@ -111,6 +111,7 @@ body {
     position: relative;
     user-select: none;
     opacity: 0.5;
+    background-color: #f5f5f5;
 }
 
 .card.active {
@@ -134,7 +135,7 @@ body {
     right: 5px;
 }
 
-.empty {
+.slot {
     flex: 1 0 21%;
     height: 90px;
     border: 1px dashed #ccc;
