@@ -45,6 +45,8 @@ body {
 .queue {
     display: flex;
     flex-wrap: wrap;
+    align-content: flex-end;
+    height: 400px;
 }
 
 /* HERO */
@@ -97,6 +99,28 @@ body {
     align-items: stretch;
 }
 
+.slot {
+    flex: 1 0 21%;
+    height: 90px;
+    border: 1px dashed #ccc;
+    border-radius: 5px;
+    margin: 5px;
+    position: relative;
+    user-select: none;
+}
+
+.slot.active {
+    border: none;
+}
+
+.slot.active .card {
+    margin: 0;
+}
+
+.slot.highlighted {
+    box-shadow: 0 0 5px rgba(81, 203, 238, 1);
+}
+
 /* CARDS */
 
 .card {
@@ -133,14 +157,4 @@ body {
     position: absolute;
     bottom: 5px;
     right: 5px;
-}
-
-.slot {
-    flex: 1 0 21%;
-    height: 90px;
-    border: 1px dashed #ccc;
-    border-radius: 5px;
-    margin: 5px;
-    position: relative;
-    user-select: none;
 }

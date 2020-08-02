@@ -6,12 +6,13 @@ import Dict exposing (Dict)
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (class, classList)
 import Html.Events exposing (onClick)
-import Html.Lazy exposing (lazy)
-import Html5.DragDrop
+import Html.Lazy exposing (lazy, lazy2)
+import Html5.DragDrop as Drag
 import Json.Decode as Decode
 import Json.Decode.Extra as DecodeX
 import Json.Encode as Encode
 import Json.Encode.Extra as EncodeX
+import Maybe.Extra as MaybeX
 import Random
 
 
@@ -65,20 +66,20 @@ emptyModel =
 
 generateRandomQueue : Cmd Msg
 generateRandomQueue =
-    Random.list 20 (Random.int 0 2)
+    Random.list 12 (Random.int 0 2)
         |> Random.generate UpdateQueue
 
 
 type alias CardDragDrop =
-    { dragDrop : Html5.DragDrop.Model Int Int
-    , hoverPos : Maybe Int
+    { dragDrop : Drag.Model Int Int
+    , highlightedSlot : Maybe Int
     }
 
 
 emptyCardDragDrop : CardDragDrop
 emptyCardDragDrop =
-    { dragDrop = Html5.DragDrop.init
-    , hoverPos = Nothing
+    { dragDrop = Drag.init
+    , highlightedSlot = Nothing
     }
 
 
@@ -100,7 +101,7 @@ type Msg
     = NoOp
     | ResetModel
     | UpdateQueue (List Int)
-    | DragDropMsg (Html5.DragDrop.Msg Int Int)
+    | DragDropMsg (Drag.Msg Int Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -120,18 +121,17 @@ update msg model =
         DragDropMsg msg_ ->
             let
                 ( newDragDrop, result ) =
-                    Html5.DragDrop.update msg_ model.cardDragDrop.dragDrop
-
-                dragId =
-                    Html5.DragDrop.getDragId newDragDrop
-
-                dropId =
-                    Html5.DragDrop.getDropId newDragDrop
+                    Drag.update msg_ model.cardDragDrop.dragDrop
 
                 newCardDragDrop =
-                    case ( dragId, dropId ) of
-                        ( Just _, _ ) ->
-                            { dragDrop = newDragDrop, hoverPos = dropId }
+                    case ( Drag.getDragId newDragDrop, Drag.getDropId newDragDrop ) of
+                        ( Just _, dropId ) ->
+                            case result of
+                                Just _ ->
+                                    { dragDrop = newDragDrop, highlightedSlot = Nothing }
+
+                                Nothing ->
+                                    { dragDrop = newDragDrop, highlightedSlot = dropId }
 
                         _ ->
                             model.cardDragDrop
@@ -162,7 +162,7 @@ view model =
             [ viewHeader
             , lazy viewQueue model.queue
             , viewHero
-            , lazy viewTeam model.team
+            , lazy2 viewTeam model.team model.cardDragDrop.highlightedSlot
             ]
         ]
 
@@ -184,10 +184,6 @@ viewQueue queue =
         (List.indexedMap viewCard <| List.take 16 queue)
 
 
-
--- VIEW ALL ENTRIES
-
-
 viewHero : Html Msg
 viewHero =
     div
@@ -198,9 +194,9 @@ viewHero =
         ]
 
 
-viewTeam : Dict Int (Maybe Int) -> Html Msg
-viewTeam team =
-    div [ class "team" ] (Dict.toList team |> List.map viewSlot)
+viewTeam : Dict Int (Maybe Int) -> Maybe Int -> Html Msg
+viewTeam team highlightedSlot =
+    div [ class "team" ] (Dict.toList team |> List.map (viewSlot highlightedSlot))
 
 
 viewCard : Int -> Int -> Html Msg
@@ -210,15 +206,20 @@ viewCard index cardID =
             getCard cardID
     in
     div
-        (classList [ ( "card", True ), ( "active", index > 11 ) ] :: Html5.DragDrop.draggable DragDropMsg cardID)
+        (classList
+            [ ( "active", index > 11 )
+            , ( "card", True )
+            ]
+            :: Drag.draggable DragDropMsg cardID
+        )
         [ div [ class "card-name" ] [ text card.name ]
         , div [ class "card-attack" ] [ text <| String.fromInt card.attack ]
         , div [ class "card-energy" ] [ text <| String.fromInt card.energy ]
         ]
 
 
-viewSlot : ( Int, Maybe Int ) -> Html Msg
-viewSlot ( slot, card ) =
+viewSlot : Maybe Int -> ( Int, Maybe Int ) -> Html Msg
+viewSlot highlightedSlot ( slot, card ) =
     let
         cardDiv =
             case card of
@@ -229,7 +230,13 @@ viewSlot ( slot, card ) =
                     []
     in
     div
-        (class "slot" :: Html5.DragDrop.droppable DragDropMsg slot)
+        (classList
+            [ ( "highlighted", highlightedSlot == Just slot )
+            , ( "active", MaybeX.isJust card )
+            , ( "slot", True )
+            ]
+            :: Drag.droppable DragDropMsg slot
+        )
         cardDiv
 
 
