@@ -44,8 +44,8 @@ body {
 
 .queue {
     display: flex;
-    flex-wrap: wrap;
-    align-content: flex-end;
+    flex-wrap: wrap-reverse;
+    align-content: flex-start;
     height: 400px;
 }
 
@@ -119,6 +119,10 @@ body {
 
 .slot.highlighted {
     box-shadow: 0 0 5px rgba(81, 203, 238, 1);
+}
+
+.slot .card {
+    opacity: 1;
 }
 
 /* CARDS */

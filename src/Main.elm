@@ -66,7 +66,7 @@ emptyModel =
 
 generateRandomQueue : Cmd Msg
 generateRandomQueue =
-    Random.list 12 (Random.int 0 2)
+    Random.list 20 (Random.int 0 2)
         |> Random.generate UpdateQueue
 
 
@@ -139,7 +139,7 @@ update msg model =
                 ( newQueue, newTeam ) =
                     case result of
                         Just ( card, slot, _ ) ->
-                            ( model.queue, Dict.insert slot (Just card) model.team )
+                            ( removeLineFromQueue model.queue, Dict.insert slot (Just card) model.team )
 
                         Nothing ->
                             ( model.queue, model.team )
@@ -147,6 +147,11 @@ update msg model =
             ( { model | cardDragDrop = newCardDragDrop, queue = newQueue, team = newTeam }
             , Cmd.none
             )
+
+
+removeLineFromQueue : List Int -> List Int
+removeLineFromQueue queue =
+    List.drop 4 queue
 
 
 
@@ -179,9 +184,15 @@ viewHeader =
 
 viewQueue : List Int -> Html Msg
 viewQueue queue =
+    let
+        activeCard i =
+            i < 4
+    in
     div
         [ class "queue" ]
-        (List.indexedMap viewCard <| List.take 16 queue)
+        (List.take 16 queue
+            |> List.indexedMap (\i -> activeCard i |> viewCard)
+        )
 
 
 viewHero : Html Msg
@@ -199,15 +210,15 @@ viewTeam team highlightedSlot =
     div [ class "team" ] (Dict.toList team |> List.map (viewSlot highlightedSlot))
 
 
-viewCard : Int -> Int -> Html Msg
-viewCard index cardID =
+viewCard : Bool -> Int -> Html Msg
+viewCard active cardID =
     let
         card =
             getCard cardID
     in
     div
         (classList
-            [ ( "active", index > 11 )
+            [ ( "active", active )
             , ( "card", True )
             ]
             :: Drag.draggable DragDropMsg cardID
@@ -224,7 +235,7 @@ viewSlot highlightedSlot ( slot, card ) =
         cardDiv =
             case card of
                 Just c ->
-                    [ viewCard 12 c ]
+                    [ viewCard False c ]
 
                 Nothing ->
                     []
