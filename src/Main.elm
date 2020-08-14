@@ -4,7 +4,7 @@ import Browser
 import Cards exposing (getCard)
 import Dict exposing (Dict)
 import Html exposing (Html, div, text)
-import Html.Attributes exposing (class, classList)
+import Html.Attributes exposing (class, classList, style)
 import Html.Events exposing (onClick)
 import Html.Lazy exposing (lazy, lazy2)
 import Html5.DragDrop as Drag
@@ -12,6 +12,7 @@ import Json.Decode as Decode
 import Json.Decode.Extra as DecodeX
 import Json.Encode as Encode
 import Json.Encode.Extra as EncodeX
+import List.Extra as ListX
 import Maybe.Extra as MaybeX
 import Random
 
@@ -185,14 +186,11 @@ viewHeader =
 viewQueue : List Int -> Html Msg
 viewQueue queue =
     let
-        activeCard i =
-            i < 4
+        groups =
+            ListX.groupsOf 4 queue
     in
-    div
-        [ class "queue" ]
-        (List.take 16 queue
-            |> List.indexedMap (\i -> activeCard i |> viewCard)
-        )
+    div [ class "queue" ]
+        (List.take 4 groups |> List.indexedMap viewGroup)
 
 
 viewHero : Html Msg
@@ -205,6 +203,18 @@ viewHero =
         ]
 
 
+viewGroup : Int -> List Int -> Html Msg
+viewGroup index group =
+    div
+        [ classList
+            [ ( "group", True )
+            , ( "active", index == 0 )
+            ]
+        , style "bottom" <| String.fromInt (index * 100) ++ "px"
+        ]
+        (List.map (viewCard <| index == 0) group)
+
+
 viewTeam : Dict Int (Maybe Int) -> Maybe Int -> Html Msg
 viewTeam team highlightedSlot =
     div [ class "team" ] (Dict.toList team |> List.map (viewSlot highlightedSlot))
@@ -215,14 +225,16 @@ viewCard active cardID =
     let
         card =
             getCard cardID
+
+        draggable =
+            if active then
+                Drag.draggable DragDropMsg cardID
+
+            else
+                []
     in
     div
-        (classList
-            [ ( "active", active )
-            , ( "card", True )
-            ]
-            :: Drag.draggable DragDropMsg cardID
-        )
+        (class "card" :: draggable)
         [ div [ class "card-name" ] [ text card.name ]
         , div [ class "card-attack" ] [ text <| String.fromInt card.attack ]
         , div [ class "card-energy" ] [ text <| String.fromInt card.energy ]

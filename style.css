@@ -1,4 +1,6 @@
-*, *:before, *:after {
+*,
+*:before,
+*:after {
     box-sizing: border-box;
 }
 
@@ -28,6 +30,7 @@ body {
 }
 
 .game {
+    width: 100%;
     padding: 10px;
 }
 
@@ -43,10 +46,15 @@ body {
 /* QUEUE */
 
 .queue {
-    display: flex;
-    flex-wrap: wrap-reverse;
-    align-content: flex-start;
     height: 400px;
+    position: relative;
+}
+
+.group {
+    display: flex;
+    overflow: hidden;
+    position: absolute;
+    width: 100%;
 }
 
 /* HERO */
@@ -142,12 +150,12 @@ body {
     background-color: #f5f5f5;
 }
 
-.card.active {
+.group.active .card {
     cursor: pointer;
     opacity: 1;
 }
 
-.card.active:hover {
+.group.active .card:hover {
     border-color: #4d4d4d;
 }
 
