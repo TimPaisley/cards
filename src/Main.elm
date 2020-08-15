@@ -12,6 +12,7 @@ import Json.Decode as Decode
 import Json.Decode.Extra as DecodeX
 import Json.Encode as Encode
 import Json.Encode.Extra as EncodeX
+import List
 import List.Extra as ListX
 import Maybe.Extra as MaybeX
 import Random
@@ -53,6 +54,7 @@ updateWithStorage msg model =
 type alias Model =
     { queue : List Int
     , team : Dict Int (Maybe Int)
+    , stage : Stage
     , cardDragDrop : CardDragDrop
     }
 
@@ -61,6 +63,7 @@ emptyModel : Model
 emptyModel =
     { queue = []
     , team = Dict.fromList [ ( 1, Nothing ), ( 2, Nothing ), ( 3, Nothing ), ( 4, Nothing ) ]
+    , stage = Build
     , cardDragDrop = emptyCardDragDrop
     }
 
@@ -69,6 +72,11 @@ generateRandomQueue : Cmd Msg
 generateRandomQueue =
     Random.list 20 (Random.int 0 2)
         |> Random.generate UpdateQueue
+
+
+type Stage
+    = Build
+    | Battle
 
 
 type alias CardDragDrop =
@@ -144,8 +152,20 @@ update msg model =
 
                         Nothing ->
                             ( model.queue, model.team )
+
+                newStage =
+                    case model.stage of
+                        Build ->
+                            if List.length newQueue == 0 then
+                                Battle
+
+                            else
+                                Build
+
+                        Battle ->
+                            Battle
             in
-            ( { model | cardDragDrop = newCardDragDrop, queue = newQueue, team = newTeam }
+            ( { model | queue = newQueue, team = newTeam, stage = newStage, cardDragDrop = newCardDragDrop }
             , Cmd.none
             )
 
@@ -165,7 +185,7 @@ view model =
         [ class "cards-wrapper" ]
         [ div
             [ class "game" ]
-            [ viewHeader
+            [ lazy viewHeader model.stage
             , lazy viewQueue model.queue
             , viewHero
             , lazy2 viewTeam model.team model.cardDragDrop.highlightedSlot
@@ -173,12 +193,12 @@ view model =
         ]
 
 
-viewHeader : Html Msg
-viewHeader =
+viewHeader : Stage -> Html Msg
+viewHeader stage =
     div
         [ class "header" ]
         [ div [] [ text "Cards" ]
-        , div [] [ text "Build Phase" ]
+        , div [] [ text <| stageToString stage ++ " Phase" ]
         , div [ onClick ResetModel ] [ text "Reset" ]
         ]
 
@@ -272,12 +292,41 @@ encode model =
     Encode.object
         [ ( "queue", Encode.list Encode.int model.queue )
         , ( "team", Encode.dict (\i -> String.fromInt i) (EncodeX.maybe Encode.int) model.team )
+        , ( "stage", Encode.string <| stageToString model.stage )
         ]
 
 
 decoder : Decode.Decoder Model
 decoder =
-    Decode.map3 Model
+    Decode.map4 Model
         (Decode.field "queue" <| Decode.list Decode.int)
         (Decode.field "team" <| DecodeX.dict2 Decode.int <| Decode.nullable Decode.int)
+        (stageDecoder "stage")
         (Decode.succeed emptyCardDragDrop)
+
+
+stageDecoder : String -> Decode.Decoder Stage
+stageDecoder stage =
+    case stage of
+        "Build" ->
+            Decode.succeed Build
+
+        "Battle" ->
+            Decode.succeed Battle
+
+        _ ->
+            Decode.fail (stage ++ " is not a recognised Stage")
+
+
+
+-- HELPERS
+
+
+stageToString : Stage -> String
+stageToString stage =
+    case stage of
+        Build ->
+            "Build"
+
+        Battle ->
+            "Battle"
