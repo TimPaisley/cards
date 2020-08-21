@@ -3,6 +3,7 @@ port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, u
 import Browser
 import Cards exposing (getCard)
 import Dict exposing (Dict)
+import Enemies exposing (getEnemy)
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (class, classList, style)
 import Html.Events exposing (onClick)
@@ -55,6 +56,7 @@ type alias Model =
     { queue : List Int
     , team : Dict Int (Maybe Int)
     , stage : Stage
+    , enemy : Int
     , cardDragDrop : CardDragDrop
     }
 
@@ -64,6 +66,7 @@ emptyModel =
     { queue = []
     , team = Dict.fromList [ ( 1, Nothing ), ( 2, Nothing ), ( 3, Nothing ), ( 4, Nothing ) ]
     , stage = Build
+    , enemy = 0
     , cardDragDrop = emptyCardDragDrop
     }
 
@@ -72,6 +75,12 @@ generateRandomQueue : Cmd Msg
 generateRandomQueue =
     Random.list 20 (Random.int 0 2)
         |> Random.generate UpdateQueue
+
+
+generateRandomEnemy : Cmd Msg
+generateRandomEnemy =
+    Random.int 0 2
+        |> Random.generate UpdateEnemy
 
 
 type Stage
@@ -99,7 +108,7 @@ init flags =
             ( model, Cmd.none )
 
         Err _ ->
-            ( emptyModel, generateRandomQueue )
+            ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
 
 
 
@@ -110,6 +119,7 @@ type Msg
     = NoOp
     | ResetModel
     | UpdateQueue (List Int)
+    | UpdateEnemy Int
     | DragDropMsg (Drag.Msg Int Int)
 
 
@@ -120,10 +130,15 @@ update msg model =
             ( model, Cmd.none )
 
         ResetModel ->
-            ( emptyModel, generateRandomQueue )
+            ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
 
         UpdateQueue cardIDs ->
             ( { model | queue = cardIDs }
+            , Cmd.none
+            )
+
+        UpdateEnemy enemyID ->
+            ( { model | enemy = enemyID }
             , Cmd.none
             )
 
@@ -181,12 +196,21 @@ removeLineFromQueue queue =
 
 view : Model -> Html Msg
 view model =
+    let
+        viewStage =
+            case model.stage of
+                Build ->
+                    lazy viewQueue model.queue
+
+                Battle ->
+                    lazy viewEnemy model.enemy
+    in
     div
         [ class "cards-wrapper" ]
         [ div
             [ class "game" ]
             [ lazy viewHeader model.stage
-            , lazy viewQueue model.queue
+            , viewStage
             , viewHero
             , lazy2 viewTeam model.team model.cardDragDrop.highlightedSlot
             ]
@@ -209,7 +233,7 @@ viewQueue queue =
         groups =
             ListX.groupsOf 4 queue
     in
-    div [ class "queue" ]
+    div [ class "stage" ]
         (List.take 4 groups |> List.indexedMap viewGroup)
 
 
@@ -220,6 +244,22 @@ viewHero =
         [ div [ class "hero-points" ] [ text <| String.fromInt 45 ]
         , div [ class "hero-portrait" ] []
         , div [ class "hero-health" ] [ text <| String.fromInt 12 ]
+        ]
+
+
+viewEnemy : Int -> Html Msg
+viewEnemy enemyID =
+    let
+        enemy =
+            getEnemy enemyID
+    in
+    div
+        [ class "stage" ]
+        [ div
+            [ class "enemy" ]
+            [ div [ class "portrait" ] [ text enemy.name ]
+            , div [ class "health" ] [ text <| String.fromInt enemy.health ]
+            ]
         ]
 
 
@@ -293,15 +333,17 @@ encode model =
         [ ( "queue", Encode.list Encode.int model.queue )
         , ( "team", Encode.dict (\i -> String.fromInt i) (EncodeX.maybe Encode.int) model.team )
         , ( "stage", Encode.string <| stageToString model.stage )
+        , ( "enemy", Encode.int <| model.enemy )
         ]
 
 
 decoder : Decode.Decoder Model
 decoder =
-    Decode.map4 Model
+    Decode.map5 Model
         (Decode.field "queue" <| Decode.list Decode.int)
         (Decode.field "team" <| DecodeX.dict2 Decode.int <| Decode.nullable Decode.int)
         (stageDecoder "stage")
+        (Decode.field "enemy" <| Decode.int)
         (Decode.succeed emptyCardDragDrop)
 
 

@@ -43,9 +43,9 @@ body {
     justify-content: space-between;
 }
 
-/* QUEUE */
+/* STAGE */
 
-.queue {
+.stage {
     height: 400px;
     position: relative;
 }
@@ -55,6 +55,23 @@ body {
     overflow: hidden;
     position: absolute;
     width: 100%;
+}
+
+.enemy .portrait {
+    width: 340px;
+    height: 340px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+}
+
+.enemy .health {
+    font-size: 2rem;
+    text-align: center;
+    padding: 1rem;
 }
 
 /* HERO */
