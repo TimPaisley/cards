@@ -3,7 +3,7 @@ port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, u
 import Browser
 import Cards exposing (Card, getCard)
 import Enemies exposing (Enemy, getEnemy)
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, button, div, p, text)
 import Html.Attributes exposing (class, classList, style)
 import Html.Events exposing (onClick)
 import Html.Lazy exposing (lazy, lazy2)
@@ -152,16 +152,16 @@ update msg model =
             ( { model | randoms = Just randoms }, Cmd.none )
 
         StartGame ->
-            case (model.phase, model.randoms) of
-                (Introduction, Just randoms) ->
+            case ( model.phase, model.randoms ) of
+                ( Introduction, Just randoms ) ->
                     let
                         queue =
                             List.map getCard randoms.queue
                     in
-                    ( { model | phase = Build queue }, Cmd.none)
+                    ( { model | phase = Build queue }, Cmd.none )
 
                 _ ->
-                    (model, Cmd.none)
+                    ( model, Cmd.none )
 
         DragDropMsg msg_ ->
             case ( model.phase, model.randoms ) of
@@ -252,10 +252,19 @@ view model =
 
 viewHeader : Phase -> Html Msg
 viewHeader phase =
+    let
+        phaseTitle =
+            case phase of
+                Introduction ->
+                    ""
+
+                _ ->
+                    phaseToString phase ++ " Phase"
+    in
     div
         [ class "header" ]
         [ div [] [ text "Cards" ]
-        , div [] [ text <| phaseToString phase ++ " Phase" ]
+        , div [] [ text phaseTitle ]
         , div [ onClick ResetModel ] [ text "Reset" ]
         ]
 
@@ -263,8 +272,23 @@ viewHeader phase =
 viewIntroduction : Html Msg
 viewIntroduction =
     div [ class "stage" ]
-        [ text "Welcome to Cards"
-        , button [ onClick StartGame ] [ text "Start Game" ]
+        [ div [ class "introduction" ]
+            [ p [] [ text "Welcome to Cards" ]
+            , p []
+                [ text """
+                    During the Build Phase, drag one card from each row into your team.
+                    The top number on each card represents how much damage the card will
+                    do when it attacks, while the bottom represents how often it will attack.
+                    """
+                ]
+            , p []
+                [ text """
+                    During the Battle Phase, your team will face an enemy. Build a team that
+                    works well together in order to defeat each challenger.
+                    """
+                ]
+            , button [ onClick StartGame ] [ text "Start Game" ]
+            ]
         ]
 
 
