@@ -17,6 +17,7 @@ import List
 import List.Extra as ListX
 import Maybe.Extra as MaybeX
 import Random
+import Time
 
 
 main : Program Encode.Value Model Msg
@@ -25,7 +26,7 @@ main =
         { init = init
         , view = \model -> { title = "Cards", body = [ view model ] }
         , update = updateWithStorage
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         }
 
 
@@ -53,7 +54,8 @@ updateWithStorage msg model =
 
 
 type alias Model =
-    { queue : List Int
+    { time : Time.Posix
+    , queue : List Int
     , team : Dict Int (Maybe Int)
     , stage : Stage
     , enemy : Int
@@ -63,7 +65,8 @@ type alias Model =
 
 emptyModel : Model
 emptyModel =
-    { queue = []
+    { time = Time.millisToPosix 0
+    , queue = []
     , team = Dict.fromList [ ( 1, Nothing ), ( 2, Nothing ), ( 3, Nothing ), ( 4, Nothing ) ]
     , stage = Build
     , enemy = 0
@@ -117,6 +120,7 @@ init flags =
 
 type Msg
     = NoOp
+    | Tick Time.Posix
     | ResetModel
     | UpdateQueue (List Int)
     | UpdateEnemy Int
@@ -128,6 +132,11 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        Tick newTime ->
+            ( { model | time = newTime }
+            , Cmd.none
+            )
 
         ResetModel ->
             ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
@@ -188,6 +197,15 @@ update msg model =
 removeLineFromQueue : List Int -> List Int
 removeLineFromQueue queue =
     List.drop 4 queue
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Time.every 1000 Tick
 
 
 
@@ -330,7 +348,8 @@ viewSlot highlightedSlot ( slot, card ) =
 encode : Model -> Encode.Value
 encode model =
     Encode.object
-        [ ( "queue", Encode.list Encode.int model.queue )
+        [ ( "time", Encode.int <| Time.posixToMillis model.time )
+        , ( "queue", Encode.list Encode.int model.queue )
         , ( "team", Encode.dict (\i -> String.fromInt i) (EncodeX.maybe Encode.int) model.team )
         , ( "stage", Encode.string <| stageToString model.stage )
         , ( "enemy", Encode.int <| model.enemy )
@@ -339,7 +358,8 @@ encode model =
 
 decoder : Decode.Decoder Model
 decoder =
-    Decode.map5 Model
+    Decode.map6 Model
+        (Decode.field "time" <| DecodeX.datetime)
         (Decode.field "queue" <| Decode.list Decode.int)
         (Decode.field "team" <| DecodeX.dict2 Decode.int <| Decode.nullable Decode.int)
         (stageDecoder "stage")
