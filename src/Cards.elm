@@ -7,6 +7,7 @@ type alias Card =
     { name : String
     , attack : Int
     , energy : Int
+    , clock : Int
     }
 
 
@@ -34,6 +35,7 @@ squid =
     { name = "Squid"
     , attack = 4
     , energy = 2
+    , clock = 0
     }
 
 
@@ -42,6 +44,7 @@ zebra =
     { name = "Zebra"
     , attack = 3
     , energy = 3
+    , clock = 0
     }
 
 
@@ -50,4 +53,5 @@ eagle =
     { name = "Eagle"
     , attack = 6
     , energy = 5
+    , clock = 0
     }

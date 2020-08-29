@@ -176,14 +176,22 @@ body {
     border-color: #4d4d4d;
 }
 
-.card .card-attack {
+.card .attack {
     position: absolute;
     top: 5px;
     left: 5px;
 }
 
-.card .card-energy {
+.card .energy {
     position: absolute;
     bottom: 5px;
     right: 5px;
+}
+
+.card .clock {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    border-radius: 4px;
+    background-color: rgba(0, 255, 0, 0.3);
 }

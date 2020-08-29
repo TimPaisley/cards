@@ -310,12 +310,16 @@ viewCard active cardID =
 
             else
                 []
+
+        clock =
+            toFloat card.clock / toFloat card.energy * 100
     in
     div
         (class "card" :: draggable)
-        [ div [ class "card-name" ] [ text card.name ]
-        , div [ class "card-attack" ] [ text <| String.fromInt card.attack ]
-        , div [ class "card-energy" ] [ text <| String.fromInt card.energy ]
+        [ div [ class "name" ] [ text card.name ]
+        , div [ class "attack" ] [ text <| String.fromInt card.attack ]
+        , div [ class "energy" ] [ text <| String.fromInt card.energy ]
+        , div [ class "clock", style "height" (String.fromFloat clock ++ "%") ] []
         ]
 
 
