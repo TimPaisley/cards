@@ -1,6 +1,6 @@
 module Cards exposing (Card, getCard)
 
-import Dict exposing (Dict)
+import List.Extra as ListX
 
 
 type alias Card =
@@ -13,7 +13,7 @@ type alias Card =
 
 getCard : Int -> Card
 getCard id =
-    case Dict.get id deck of
+    case ListX.getAt id deck of
         Just card ->
             card
 
@@ -21,13 +21,12 @@ getCard id =
             squid
 
 
-deck : Dict Int Card
+deck : List Card
 deck =
-    Dict.fromList
-        [ ( 0, squid )
-        , ( 1, zebra )
-        , ( 2, eagle )
-        ]
+    [ squid
+    , zebra
+    , eagle
+    ]
 
 
 squid : Card

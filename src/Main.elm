@@ -1,9 +1,8 @@
 port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, update, updateWithStorage, view, viewCard, viewHero, viewQueue, viewTeam)
 
 import Browser
-import Cards exposing (getCard)
-import Dict exposing (Dict)
-import Enemies exposing (getEnemy)
+import Cards exposing (Card, getCard)
+import Enemies exposing (Enemy, getEnemy)
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (class, classList, style)
 import Html.Events exposing (onClick)
@@ -55,10 +54,10 @@ updateWithStorage msg model =
 
 type alias Model =
     { time : Time.Posix
-    , queue : List Int
-    , team : Dict Int (Maybe Int)
+    , queue : List Card
+    , team : List (Maybe Card)
     , stage : Stage
-    , enemy : Int
+    , enemy : Maybe Enemy
     , cardDragDrop : CardDragDrop
     }
 
@@ -67,9 +66,9 @@ emptyModel : Model
 emptyModel =
     { time = Time.millisToPosix 0
     , queue = []
-    , team = Dict.fromList [ ( 1, Nothing ), ( 2, Nothing ), ( 3, Nothing ), ( 4, Nothing ) ]
+    , team = List.repeat 4 Nothing
     , stage = Build
-    , enemy = 0
+    , enemy = Nothing
     , cardDragDrop = emptyCardDragDrop
     }
 
@@ -92,7 +91,7 @@ type Stage
 
 
 type alias CardDragDrop =
-    { dragDrop : Drag.Model Int Int
+    { dragDrop : Drag.Model Card Int
     , highlightedSlot : Maybe Int
     }
 
@@ -106,7 +105,7 @@ emptyCardDragDrop =
 
 init : Encode.Value -> ( Model, Cmd Msg )
 init flags =
-    case Decode.decodeValue decoder flags of
+    case Decode.decodeValue decode flags of
         Ok model ->
             ( model, Cmd.none )
 
@@ -124,7 +123,7 @@ type Msg
     | ResetModel
     | UpdateQueue (List Int)
     | UpdateEnemy Int
-    | DragDropMsg (Drag.Msg Int Int)
+    | DragDropMsg (Drag.Msg Card Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -142,12 +141,12 @@ update msg model =
             ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
 
         UpdateQueue cardIDs ->
-            ( { model | queue = cardIDs }
+            ( { model | queue = List.map getCard cardIDs }
             , Cmd.none
             )
 
         UpdateEnemy enemyID ->
-            ( { model | enemy = enemyID }
+            ( { model | enemy = Just (getEnemy enemyID) }
             , Cmd.none
             )
 
@@ -172,7 +171,7 @@ update msg model =
                 ( newQueue, newTeam ) =
                     case result of
                         Just ( card, slot, _ ) ->
-                            ( removeLineFromQueue model.queue, Dict.insert slot (Just card) model.team )
+                            ( removeLineFromQueue model.queue, ListX.setAt slot (Just card) model.team )
 
                         Nothing ->
                             ( model.queue, model.team )
@@ -194,7 +193,7 @@ update msg model =
             )
 
 
-removeLineFromQueue : List Int -> List Int
+removeLineFromQueue : List Card -> List Card
 removeLineFromQueue queue =
     List.drop 4 queue
 
@@ -221,7 +220,7 @@ view model =
                     lazy viewQueue model.queue
 
                 Battle ->
-                    lazy viewEnemy model.enemy
+                    lazy viewEnemy (Maybe.withDefault (getEnemy 0) model.enemy)
     in
     div
         [ class "cards-wrapper" ]
@@ -245,7 +244,7 @@ viewHeader stage =
         ]
 
 
-viewQueue : List Int -> Html Msg
+viewQueue : List Card -> Html Msg
 viewQueue queue =
     let
         groups =
@@ -265,12 +264,8 @@ viewHero =
         ]
 
 
-viewEnemy : Int -> Html Msg
-viewEnemy enemyID =
-    let
-        enemy =
-            getEnemy enemyID
-    in
+viewEnemy : Enemy -> Html Msg
+viewEnemy enemy =
     div
         [ class "stage" ]
         [ div
@@ -281,7 +276,7 @@ viewEnemy enemyID =
         ]
 
 
-viewGroup : Int -> List Int -> Html Msg
+viewGroup : Int -> List Card -> Html Msg
 viewGroup index group =
     div
         [ classList
@@ -293,20 +288,17 @@ viewGroup index group =
         (List.map (viewCard <| index == 0) group)
 
 
-viewTeam : Dict Int (Maybe Int) -> Maybe Int -> Html Msg
+viewTeam : List (Maybe Card) -> Maybe Int -> Html Msg
 viewTeam team highlightedSlot =
-    div [ class "team" ] (Dict.toList team |> List.map (viewSlot highlightedSlot))
+    div [ class "team" ] (List.indexedMap (viewSlot highlightedSlot) team)
 
 
-viewCard : Bool -> Int -> Html Msg
-viewCard active cardID =
+viewCard : Bool -> Card -> Html Msg
+viewCard active card =
     let
-        card =
-            getCard cardID
-
         draggable =
             if active then
-                Drag.draggable DragDropMsg cardID
+                Drag.draggable DragDropMsg card
 
             else
                 []
@@ -323,8 +315,8 @@ viewCard active cardID =
         ]
 
 
-viewSlot : Maybe Int -> ( Int, Maybe Int ) -> Html Msg
-viewSlot highlightedSlot ( slot, card ) =
+viewSlot : Maybe Int -> Int -> Maybe Card -> Html Msg
+viewSlot highlightedSlot slot card =
     let
         cardDiv =
             case card of
@@ -352,27 +344,71 @@ viewSlot highlightedSlot ( slot, card ) =
 encode : Model -> Encode.Value
 encode model =
     Encode.object
-        [ ( "time", Encode.int <| Time.posixToMillis model.time )
-        , ( "queue", Encode.list Encode.int model.queue )
-        , ( "team", Encode.dict (\i -> String.fromInt i) (EncodeX.maybe Encode.int) model.team )
-        , ( "stage", Encode.string <| stageToString model.stage )
-        , ( "enemy", Encode.int <| model.enemy )
+        [ ( "time", Encode.int (Time.posixToMillis model.time) )
+        , ( "queue", Encode.list encodeCard model.queue )
+        , ( "team", Encode.list (EncodeX.maybe encodeCard) model.team )
+        , ( "stage", Encode.string (stageToString model.stage) )
+        , ( "enemy", EncodeX.maybe encodeEnemy model.enemy )
         ]
 
 
-decoder : Decode.Decoder Model
-decoder =
+encodeCard : Card -> Encode.Value
+encodeCard card =
+    Encode.object
+        [ ( "name", Encode.string card.name )
+        , ( "attack", Encode.int card.attack )
+        , ( "energy", Encode.int card.energy )
+        , ( "clock", Encode.int card.clock )
+        ]
+
+
+encodeEnemy : Enemy -> Encode.Value
+encodeEnemy enemy =
+    Encode.object
+        [ ( "name", Encode.string enemy.name )
+        , ( "attack", Encode.int enemy.attack )
+        , ( "energy", Encode.int enemy.energy )
+        , ( "health", Encode.int enemy.health )
+        ]
+
+
+decode : Decode.Decoder Model
+decode =
     Decode.map6 Model
-        (Decode.field "time" <| DecodeX.datetime)
-        (Decode.field "queue" <| Decode.list Decode.int)
-        (Decode.field "team" <| DecodeX.dict2 Decode.int <| Decode.nullable Decode.int)
-        (stageDecoder "stage")
-        (Decode.field "enemy" <| Decode.int)
+        (Decode.field "time" DecodeX.datetime)
+        (Decode.field "queue" (Decode.list decodeCard))
+        (Decode.field "team" decodeTeam)
+        (decodeStage "stage")
+        (Decode.field "enemy" (Decode.nullable decodeEnemy))
         (Decode.succeed emptyCardDragDrop)
 
 
-stageDecoder : String -> Decode.Decoder Stage
-stageDecoder stage =
+decodeTeam : Decode.Decoder (List (Maybe Card))
+decodeTeam =
+    Decode.nullable decodeCard
+        |> Decode.list
+
+
+decodeCard : Decode.Decoder Card
+decodeCard =
+    Decode.map4 Card
+        (Decode.field "name" Decode.string)
+        (Decode.field "attack" Decode.int)
+        (Decode.field "energy" Decode.int)
+        (Decode.field "clock" Decode.int)
+
+
+decodeEnemy : Decode.Decoder Enemy
+decodeEnemy =
+    Decode.map4 Enemy
+        (Decode.field "name" Decode.string)
+        (Decode.field "attack" Decode.int)
+        (Decode.field "energy" Decode.int)
+        (Decode.field "health" Decode.int)
+
+
+decodeStage : String -> Decode.Decoder Stage
+decodeStage stage =
     case stage of
         "Build" ->
             Decode.succeed Build

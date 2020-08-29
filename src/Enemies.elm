@@ -1,6 +1,6 @@
 module Enemies exposing (Enemy, getEnemy)
 
-import Dict exposing (Dict)
+import List.Extra as ListX
 
 
 type alias Enemy =
@@ -13,7 +13,7 @@ type alias Enemy =
 
 getEnemy : Int -> Enemy
 getEnemy id =
-    case Dict.get id deck of
+    case ListX.getAt id deck of
         Just card ->
             card
 
@@ -21,13 +21,9 @@ getEnemy id =
             ogre
 
 
-deck : Dict Int Enemy
+deck : List Enemy
 deck =
-    Dict.fromList
-        [ ( 0, ogre )
-        , ( 1, hydra )
-        , ( 2, titan )
-        ]
+    [ ogre, hydra, titan ]
 
 
 ogre : Enemy
