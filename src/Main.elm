@@ -3,7 +3,7 @@ port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, u
 import Browser
 import Cards exposing (Card, getCard)
 import Enemies exposing (Enemy, getEnemy)
-import Html exposing (Html, div, text)
+import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (class, classList, style)
 import Html.Events exposing (onClick)
 import Html.Lazy exposing (lazy, lazy2)
@@ -54,46 +54,54 @@ updateWithStorage msg model =
 
 type alias Model =
     { time : Time.Posix
-    , queue : List Card
+    , randoms : Maybe Randoms
     , team : List (Maybe Card)
-    , stage : Stage
-    , enemy : Maybe Enemy
+    , phase : Phase
     , cardDragDrop : CardDragDrop
     }
 
 
-emptyModel : Model
-emptyModel =
-    { time = Time.millisToPosix 0
-    , queue = []
-    , team = List.repeat 4 Nothing
-    , stage = Build
-    , enemy = Nothing
-    , cardDragDrop = emptyCardDragDrop
+type alias Randoms =
+    { queue : List Int
+    , enemy : Int
     }
 
 
-generateRandomQueue : Cmd Msg
-generateRandomQueue =
-    Random.list 20 (Random.int 0 2)
-        |> Random.generate UpdateQueue
-
-
-generateRandomEnemy : Cmd Msg
-generateRandomEnemy =
-    Random.int 0 2
-        |> Random.generate UpdateEnemy
-
-
-type Stage
-    = Build
-    | Battle
+type Phase
+    = Introduction
+    | Build (List Card)
+    | Battle Enemy
 
 
 type alias CardDragDrop =
     { dragDrop : Drag.Model Card Int
     , highlightedSlot : Maybe Int
     }
+
+
+emptyModel : Model
+emptyModel =
+    { time = Time.millisToPosix 0
+    , randoms = Nothing
+    , team = List.repeat 4 Nothing
+    , phase = Introduction
+    , cardDragDrop = emptyCardDragDrop
+    }
+
+
+generateRandoms : Cmd Msg
+generateRandoms =
+    let
+        createRandoms queue enemy =
+            { queue = queue
+            , enemy = enemy
+            }
+    in
+    Random.map2
+        createRandoms
+        (Random.list 20 (Random.int 0 2))
+        (Random.int 0 2)
+        |> Random.generate UpdateRandoms
 
 
 emptyCardDragDrop : CardDragDrop
@@ -110,7 +118,7 @@ init flags =
             ( model, Cmd.none )
 
         Err _ ->
-            ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
+            ( emptyModel, generateRandoms )
 
 
 
@@ -121,8 +129,8 @@ type Msg
     = NoOp
     | Tick Time.Posix
     | ResetModel
-    | UpdateQueue (List Int)
-    | UpdateEnemy Int
+    | UpdateRandoms Randoms
+    | StartGame
     | DragDropMsg (Drag.Msg Card Int)
 
 
@@ -138,59 +146,64 @@ update msg model =
             )
 
         ResetModel ->
-            ( emptyModel, Cmd.batch [ generateRandomQueue, generateRandomEnemy ] )
+            ( emptyModel, generateRandoms )
 
-        UpdateQueue cardIDs ->
-            ( { model | queue = List.map getCard cardIDs }
-            , Cmd.none
-            )
+        UpdateRandoms randoms ->
+            ( { model | randoms = Just randoms }, Cmd.none )
 
-        UpdateEnemy enemyID ->
-            ( { model | enemy = Just (getEnemy enemyID) }
-            , Cmd.none
-            )
+        StartGame ->
+            case (model.phase, model.randoms) of
+                (Introduction, Just randoms) ->
+                    let
+                        queue =
+                            List.map getCard randoms.queue
+                    in
+                    ( { model | phase = Build queue }, Cmd.none)
+
+                _ ->
+                    (model, Cmd.none)
 
         DragDropMsg msg_ ->
-            let
-                ( newDragDrop, result ) =
-                    Drag.update msg_ model.cardDragDrop.dragDrop
+            case ( model.phase, model.randoms ) of
+                ( Build queue, Just randoms ) ->
+                    let
+                        ( newDragDrop, result ) =
+                            Drag.update msg_ model.cardDragDrop.dragDrop
 
-                newCardDragDrop =
-                    case ( Drag.getDragId newDragDrop, Drag.getDropId newDragDrop ) of
-                        ( Just _, dropId ) ->
-                            case result of
-                                Just _ ->
-                                    { dragDrop = newDragDrop, highlightedSlot = Nothing }
+                        newCardDragDrop =
+                            case ( Drag.getDragId newDragDrop, Drag.getDropId newDragDrop ) of
+                                ( Just _, dropId ) ->
+                                    case result of
+                                        Just _ ->
+                                            { dragDrop = newDragDrop, highlightedSlot = Nothing }
 
-                                Nothing ->
-                                    { dragDrop = newDragDrop, highlightedSlot = dropId }
+                                        Nothing ->
+                                            { dragDrop = newDragDrop, highlightedSlot = dropId }
 
-                        _ ->
-                            model.cardDragDrop
+                                _ ->
+                                    model.cardDragDrop
 
-                ( newQueue, newTeam ) =
-                    case result of
-                        Just ( card, slot, _ ) ->
-                            ( removeLineFromQueue model.queue, ListX.setAt slot (Just card) model.team )
+                        ( newQueue, newTeam ) =
+                            case ( result, model.phase ) of
+                                ( Just ( card, slot, _ ), Build q ) ->
+                                    ( removeLineFromQueue q, ListX.setAt slot (Just card) model.team )
 
-                        Nothing ->
-                            ( model.queue, model.team )
+                                _ ->
+                                    ( queue, model.team )
 
-                newStage =
-                    case model.stage of
-                        Build ->
+                        newPhase =
                             if List.length newQueue == 0 then
-                                Battle
+                                Battle (getEnemy randoms.enemy)
 
                             else
-                                Build
+                                Build newQueue
+                    in
+                    ( { model | phase = newPhase, team = newTeam, cardDragDrop = newCardDragDrop }
+                    , Cmd.none
+                    )
 
-                        Battle ->
-                            Battle
-            in
-            ( { model | queue = newQueue, team = newTeam, stage = newStage, cardDragDrop = newCardDragDrop }
-            , Cmd.none
-            )
+                _ ->
+                    ( model, Cmd.none )
 
 
 removeLineFromQueue : List Card -> List Card
@@ -215,18 +228,21 @@ view : Model -> Html Msg
 view model =
     let
         viewStage =
-            case model.stage of
-                Build ->
-                    lazy viewQueue model.queue
+            case model.phase of
+                Introduction ->
+                    viewIntroduction
 
-                Battle ->
-                    lazy viewEnemy (Maybe.withDefault (getEnemy 0) model.enemy)
+                Build queue ->
+                    lazy viewQueue queue
+
+                Battle enemy ->
+                    lazy viewEnemy enemy
     in
     div
         [ class "cards-wrapper" ]
         [ div
             [ class "game" ]
-            [ lazy viewHeader model.stage
+            [ lazy viewHeader model.phase
             , viewStage
             , viewHero
             , lazy2 viewTeam model.team model.cardDragDrop.highlightedSlot
@@ -234,13 +250,21 @@ view model =
         ]
 
 
-viewHeader : Stage -> Html Msg
-viewHeader stage =
+viewHeader : Phase -> Html Msg
+viewHeader phase =
     div
         [ class "header" ]
         [ div [] [ text "Cards" ]
-        , div [] [ text <| stageToString stage ++ " Phase" ]
+        , div [] [ text <| phaseToString phase ++ " Phase" ]
         , div [ onClick ResetModel ] [ text "Reset" ]
+        ]
+
+
+viewIntroduction : Html Msg
+viewIntroduction =
+    div [ class "stage" ]
+        [ text "Welcome to Cards"
+        , button [ onClick StartGame ] [ text "Start Game" ]
         ]
 
 
@@ -345,11 +369,39 @@ encode : Model -> Encode.Value
 encode model =
     Encode.object
         [ ( "time", Encode.int (Time.posixToMillis model.time) )
-        , ( "queue", Encode.list encodeCard model.queue )
+        , ( "randoms", EncodeX.maybe encodeRandoms model.randoms )
         , ( "team", Encode.list (EncodeX.maybe encodeCard) model.team )
-        , ( "stage", Encode.string (stageToString model.stage) )
-        , ( "enemy", EncodeX.maybe encodeEnemy model.enemy )
+        , ( "phase", encodePhase model.phase )
         ]
+
+
+encodeRandoms : Randoms -> Encode.Value
+encodeRandoms randoms =
+    Encode.object
+        [ ( "queue", Encode.list Encode.int randoms.queue )
+        , ( "enemy", Encode.int randoms.enemy )
+        ]
+
+
+encodePhase : Phase -> Encode.Value
+encodePhase phase =
+    case phase of
+        Introduction ->
+            Encode.object
+                [ ( "name", Encode.string "introduction" )
+                ]
+
+        Build queue ->
+            Encode.object
+                [ ( "name", Encode.string "build" )
+                , ( "queue", Encode.list encodeCard queue )
+                ]
+
+        Battle enemy ->
+            Encode.object
+                [ ( "name", Encode.string "battle" )
+                , ( "enemy", encodeEnemy enemy )
+                ]
 
 
 encodeCard : Card -> Encode.Value
@@ -374,13 +426,19 @@ encodeEnemy enemy =
 
 decode : Decode.Decoder Model
 decode =
-    Decode.map6 Model
+    Decode.map5 Model
         (Decode.field "time" DecodeX.datetime)
-        (Decode.field "queue" (Decode.list decodeCard))
+        (Decode.field "randoms" (Decode.nullable decodeRandoms))
         (Decode.field "team" decodeTeam)
-        (decodeStage "stage")
-        (Decode.field "enemy" (Decode.nullable decodeEnemy))
+        (Decode.field "phase" decodePhase)
         (Decode.succeed emptyCardDragDrop)
+
+
+decodeRandoms : Decode.Decoder Randoms
+decodeRandoms =
+    Decode.map2 Randoms
+        (Decode.field "queue" (Decode.list Decode.int))
+        (Decode.field "enemy" Decode.int)
 
 
 decodeTeam : Decode.Decoder (List (Maybe Card))
@@ -407,28 +465,43 @@ decodeEnemy =
         (Decode.field "health" Decode.int)
 
 
-decodeStage : String -> Decode.Decoder Stage
-decodeStage stage =
-    case stage of
-        "Build" ->
-            Decode.succeed Build
+decodePhase : Decode.Decoder Phase
+decodePhase =
+    let
+        decodePhaseAssociations phase =
+            case phase of
+                "introduction" ->
+                    Decode.succeed Introduction
 
-        "Battle" ->
-            Decode.succeed Battle
+                "build" ->
+                    Decode.field "queue" (Decode.list Decode.int)
+                        |> Decode.map (List.map getCard)
+                        |> Decode.map Build
 
-        _ ->
-            Decode.fail (stage ++ " is not a recognised Stage")
+                "battle" ->
+                    Decode.field "enemy" Decode.int
+                        |> Decode.map getEnemy
+                        |> Decode.map Battle
+
+                _ ->
+                    Decode.fail (phase ++ " is not a recognised Phase")
+    in
+    Decode.field "name" Decode.string
+        |> Decode.andThen decodePhaseAssociations
 
 
 
 -- HELPERS
 
 
-stageToString : Stage -> String
-stageToString stage =
+phaseToString : Phase -> String
+phaseToString stage =
     case stage of
-        Build ->
+        Introduction ->
+            "Introduction"
+
+        Build _ ->
             "Build"
 
-        Battle ->
+        Battle _ ->
             "Battle"
