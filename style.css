@@ -155,10 +155,6 @@ body {
     margin: 0;
 }
 
-.slot.highlighted {
-    box-shadow: 0 0 5px rgba(81, 203, 238, 1);
-}
-
 .slot .card {
     opacity: 1;
 }
@@ -206,5 +202,5 @@ body {
     bottom: 0;
     width: 100%;
     border-radius: 4px;
-    background-color: rgba(0, 255, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.03);
 }

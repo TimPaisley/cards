@@ -141,7 +141,37 @@ update msg model =
             ( model, Cmd.none )
 
         Tick newTime ->
-            ( { model | time = newTime }
+            let
+                ( newPhase, newTeam ) =
+                    case model.phase of
+                        Battle enemy ->
+                            let
+                                updateClock card =
+                                    if card.clock < card.energy then
+                                        { card | clock = card.clock + 1 }
+
+                                    else
+                                        { card | clock = 0 }
+
+                                tickedTeam =
+                                    List.map (\c -> Maybe.map updateClock c) model.team
+
+                                addDamage card accumulatedDamage =
+                                    if card.clock == 0 then
+                                        accumulatedDamage + card.attack
+
+                                    else
+                                        accumulatedDamage
+
+                                newEnemy =
+                                    { enemy | health = enemy.health - List.foldl addDamage 0 (MaybeX.values tickedTeam) }
+                            in
+                            ( Battle newEnemy, tickedTeam )
+
+                        _ ->
+                            ( model.phase, model.team )
+            in
+            ( { model | time = newTime, team = newTeam, phase = newPhase }
             , Cmd.none
             )
 
