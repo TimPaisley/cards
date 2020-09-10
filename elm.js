@@ -6106,11 +6106,41 @@ var $author$project$Main$Build = function (a) {
 };
 var $author$project$Main$Introduction = {$: 'Introduction'};
 var $elm$json$Json$Decode$field = _Json_decodeField;
-var $author$project$Cards$eagle = {attack: 6, clock: 0, energy: 5, name: 'Eagle'};
-var $author$project$Cards$squid = {attack: 4, clock: 0, energy: 2, name: 'Squid'};
-var $author$project$Cards$zebra = {attack: 3, clock: 0, energy: 3, name: 'Zebra'};
+var $author$project$Abilities$Orchestration = function (a) {
+	return {$: 'Orchestration', a: a};
+};
+var $author$project$Cards$lion = {
+	ability: $elm$core$Maybe$Just(
+		$author$project$Abilities$Orchestration(2)),
+	attack: 4,
+	clock: 0,
+	energy: 2,
+	name: 'Lion'
+};
+var $author$project$Abilities$Unity = function (a) {
+	return {$: 'Unity', a: a};
+};
+var $author$project$Cards$meerkat = {
+	ability: $elm$core$Maybe$Just(
+		$author$project$Abilities$Unity(2)),
+	attack: 3,
+	clock: 0,
+	energy: 3,
+	name: 'Meerkat'
+};
+var $author$project$Abilities$Momentum = function (a) {
+	return {$: 'Momentum', a: a};
+};
+var $author$project$Cards$rhinoceros = {
+	ability: $elm$core$Maybe$Just(
+		$author$project$Abilities$Momentum(1)),
+	attack: 6,
+	clock: 0,
+	energy: 5,
+	name: 'Rhinoceros'
+};
 var $author$project$Cards$deck = _List_fromArray(
-	[$author$project$Cards$squid, $author$project$Cards$zebra, $author$project$Cards$eagle]);
+	[$author$project$Cards$lion, $author$project$Cards$meerkat, $author$project$Cards$rhinoceros]);
 var $elm$core$List$drop = F2(
 	function (n, list) {
 		drop:
@@ -6152,7 +6182,7 @@ var $author$project$Cards$getCard = function (id) {
 		var card = _v0.a;
 		return card;
 	} else {
-		return $author$project$Cards$squid;
+		return $author$project$Cards$lion;
 	}
 };
 var $author$project$Enemies$hydra = {attack: 6, energy: 3, health: 400, name: 'Hydra'};
@@ -6174,9 +6204,9 @@ var $elm$json$Json$Decode$list = _Json_decodeList;
 var $author$project$Main$decodePhase = function () {
 	var decodePhaseAssociations = function (phase) {
 		switch (phase) {
-			case 'introduction':
+			case 'Introduction':
 				return $elm$json$Json$Decode$succeed($author$project$Main$Introduction);
-			case 'build':
+			case 'Build':
 				return A2(
 					$elm$json$Json$Decode$map,
 					$author$project$Main$Build,
@@ -6187,7 +6217,7 @@ var $author$project$Main$decodePhase = function () {
 							$elm$json$Json$Decode$field,
 							'queue',
 							$elm$json$Json$Decode$list($elm$json$Json$Decode$int))));
-			case 'battle':
+			case 'Battle':
 				return A2(
 					$elm$json$Json$Decode$map,
 					$author$project$Main$Battle,
@@ -6216,18 +6246,40 @@ var $author$project$Main$decodeRandoms = A3(
 		'queue',
 		$elm$json$Json$Decode$list($elm$json$Json$Decode$int)),
 	A2($elm$json$Json$Decode$field, 'enemy', $elm$json$Json$Decode$int));
-var $author$project$Cards$Card = F4(
-	function (name, attack, energy, clock) {
-		return {attack: attack, clock: clock, energy: energy, name: name};
+var $author$project$Cards$Card = F5(
+	function (name, attack, energy, clock, ability) {
+		return {ability: ability, attack: attack, clock: clock, energy: energy, name: name};
 	});
-var $elm$json$Json$Decode$map4 = _Json_map4;
-var $author$project$Main$decodeCard = A5(
-	$elm$json$Json$Decode$map4,
-	$author$project$Cards$Card,
-	A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
-	A2($elm$json$Json$Decode$field, 'attack', $elm$json$Json$Decode$int),
-	A2($elm$json$Json$Decode$field, 'energy', $elm$json$Json$Decode$int),
-	A2($elm$json$Json$Decode$field, 'clock', $elm$json$Json$Decode$int));
+var $elm$core$Tuple$pair = F2(
+	function (a, b) {
+		return _Utils_Tuple2(a, b);
+	});
+var $author$project$Abilities$decodeAbility = function () {
+	var decodeValue = A2($elm$json$Json$Decode$field, 'value', $elm$json$Json$Decode$int);
+	var decodeName = A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string);
+	var decodeFullAbility = function (_v1) {
+		var name = _v1.a;
+		var value = _v1.b;
+		switch (name) {
+			case 'Orchestration':
+				return $elm$json$Json$Decode$succeed(
+					$author$project$Abilities$Orchestration(value));
+			case 'Unity':
+				return $elm$json$Json$Decode$succeed(
+					$author$project$Abilities$Unity(value));
+			case 'Momentum':
+				return $elm$json$Json$Decode$succeed(
+					$author$project$Abilities$Momentum(value));
+			default:
+				return $elm$json$Json$Decode$fail(name + ' is not a recognised Ability');
+		}
+	};
+	return A2(
+		$elm$json$Json$Decode$andThen,
+		decodeFullAbility,
+		A3($elm$json$Json$Decode$map2, $elm$core$Tuple$pair, decodeName, decodeValue));
+}();
+var $elm$json$Json$Decode$map5 = _Json_map5;
 var $elm$json$Json$Decode$null = _Json_decodeNull;
 var $elm$json$Json$Decode$oneOf = _Json_oneOf;
 var $elm$json$Json$Decode$nullable = function (decoder) {
@@ -6238,12 +6290,22 @@ var $elm$json$Json$Decode$nullable = function (decoder) {
 				A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, decoder)
 			]));
 };
+var $author$project$Cards$decodeCard = A6(
+	$elm$json$Json$Decode$map5,
+	$author$project$Cards$Card,
+	A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+	A2($elm$json$Json$Decode$field, 'attack', $elm$json$Json$Decode$int),
+	A2($elm$json$Json$Decode$field, 'energy', $elm$json$Json$Decode$int),
+	A2($elm$json$Json$Decode$field, 'clock', $elm$json$Json$Decode$int),
+	A2(
+		$elm$json$Json$Decode$field,
+		'ability',
+		$elm$json$Json$Decode$nullable($author$project$Abilities$decodeAbility)));
 var $author$project$Main$decodeTeam = $elm$json$Json$Decode$list(
-	$elm$json$Json$Decode$nullable($author$project$Main$decodeCard));
+	$elm$json$Json$Decode$nullable($author$project$Cards$decodeCard));
 var $norpan$elm_html5_drag_drop$Html5$DragDrop$NotDragging = {$: 'NotDragging'};
 var $norpan$elm_html5_drag_drop$Html5$DragDrop$init = $norpan$elm_html5_drag_drop$Html5$DragDrop$NotDragging;
 var $author$project$Main$emptyCardDragDrop = {dragDrop: $norpan$elm_html5_drag_drop$Html5$DragDrop$init, highlightedSlot: $elm$core$Maybe$Nothing};
-var $elm$json$Json$Decode$map5 = _Json_map5;
 var $author$project$Main$decode = A6(
 	$elm$json$Json$Decode$map5,
 	$author$project$Main$Model,
@@ -6909,6 +6971,19 @@ var $elm$time$Time$every = F2(
 var $author$project$Main$subscriptions = function (_v0) {
 	return A2($elm$time$Time$every, 1000, $author$project$Main$Tick);
 };
+var $author$project$Abilities$abilityToString = function (ability) {
+	switch (ability.$) {
+		case 'Orchestration':
+			var val = ability.a;
+			return _Utils_Tuple2('Orchestration', val);
+		case 'Unity':
+			var val = ability.a;
+			return _Utils_Tuple2('Unity', val);
+		default:
+			var val = ability.a;
+			return _Utils_Tuple2('Momentum', val);
+	}
+};
 var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$object = function (pairs) {
 	return _Json_wrap(
@@ -6923,8 +6998,57 @@ var $elm$json$Json$Encode$object = function (pairs) {
 			_Json_emptyObject(_Utils_Tuple0),
 			pairs));
 };
+var $elm$core$Tuple$second = function (_v0) {
+	var y = _v0.b;
+	return y;
+};
 var $elm$json$Json$Encode$string = _Json_wrap;
-var $author$project$Main$encodeCard = function (card) {
+var $author$project$Abilities$encodeAbility = function (ability) {
+	return $elm$json$Json$Encode$object(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				'name',
+				$elm$json$Json$Encode$string(
+					$author$project$Abilities$abilityToString(ability).a)),
+				_Utils_Tuple2(
+				'value',
+				$elm$json$Json$Encode$int(
+					$author$project$Abilities$abilityToString(ability).b))
+			]));
+};
+var $elm$core$Basics$composeR = F3(
+	function (f, g, x) {
+		return g(
+			f(x));
+	});
+var $elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return $elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
+var $elm$json$Json$Encode$null = _Json_encodeNull;
+var $elm$core$Maybe$withDefault = F2(
+	function (_default, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return value;
+		} else {
+			return _default;
+		}
+	});
+var $elm_community$json_extra$Json$Encode$Extra$maybe = function (encoder) {
+	return A2(
+		$elm$core$Basics$composeR,
+		$elm$core$Maybe$map(encoder),
+		$elm$core$Maybe$withDefault($elm$json$Json$Encode$null));
+};
+var $author$project$Cards$encodeCard = function (card) {
 	return $elm$json$Json$Encode$object(
 		_List_fromArray(
 			[
@@ -6939,7 +7063,10 @@ var $author$project$Main$encodeCard = function (card) {
 				$elm$json$Json$Encode$int(card.energy)),
 				_Utils_Tuple2(
 				'clock',
-				$elm$json$Json$Encode$int(card.clock))
+				$elm$json$Json$Encode$int(card.clock)),
+				_Utils_Tuple2(
+				'ability',
+				A2($elm_community$json_extra$Json$Encode$Extra$maybe, $author$project$Abilities$encodeAbility, card.ability))
 			]));
 };
 var $author$project$Main$encodeEnemy = function (enemy) {
@@ -6977,7 +7104,7 @@ var $author$project$Main$encodePhase = function (phase) {
 					[
 						_Utils_Tuple2(
 						'name',
-						$elm$json$Json$Encode$string('introduction'))
+						$elm$json$Json$Encode$string('Introduction'))
 					]));
 		case 'Build':
 			var queue = phase.a;
@@ -6986,10 +7113,10 @@ var $author$project$Main$encodePhase = function (phase) {
 					[
 						_Utils_Tuple2(
 						'name',
-						$elm$json$Json$Encode$string('build')),
+						$elm$json$Json$Encode$string('Build')),
 						_Utils_Tuple2(
 						'queue',
-						A2($elm$json$Json$Encode$list, $author$project$Main$encodeCard, queue))
+						A2($elm$json$Json$Encode$list, $author$project$Cards$encodeCard, queue))
 					]));
 		default:
 			var enemy = phase.a;
@@ -6998,7 +7125,7 @@ var $author$project$Main$encodePhase = function (phase) {
 					[
 						_Utils_Tuple2(
 						'name',
-						$elm$json$Json$Encode$string('battle')),
+						$elm$json$Json$Encode$string('Battle')),
 						_Utils_Tuple2(
 						'enemy',
 						$author$project$Main$encodeEnemy(enemy))
@@ -7017,37 +7144,6 @@ var $author$project$Main$encodeRandoms = function (randoms) {
 				$elm$json$Json$Encode$int(randoms.enemy))
 			]));
 };
-var $elm$core$Basics$composeR = F3(
-	function (f, g, x) {
-		return g(
-			f(x));
-	});
-var $elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return $elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	});
-var $elm$json$Json$Encode$null = _Json_encodeNull;
-var $elm$core$Maybe$withDefault = F2(
-	function (_default, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return value;
-		} else {
-			return _default;
-		}
-	});
-var $elm_community$json_extra$Json$Encode$Extra$maybe = function (encoder) {
-	return A2(
-		$elm$core$Basics$composeR,
-		$elm$core$Maybe$map(encoder),
-		$elm$core$Maybe$withDefault($elm$json$Json$Encode$null));
-};
 var $author$project$Main$encode = function (model) {
 	return $elm$json$Json$Encode$object(
 		_List_fromArray(
@@ -7063,7 +7159,7 @@ var $author$project$Main$encode = function (model) {
 				'team',
 				A2(
 					$elm$json$Json$Encode$list,
-					$elm_community$json_extra$Json$Encode$Extra$maybe($author$project$Main$encodeCard),
+					$elm_community$json_extra$Json$Encode$Extra$maybe($author$project$Cards$encodeCard),
 					model.team)),
 				_Utils_Tuple2(
 				'phase',
@@ -7781,10 +7877,6 @@ var $elm$core$List$filter = F2(
 			_List_Nil,
 			list);
 	});
-var $elm$core$Tuple$second = function (_v0) {
-	var y = _v0.b;
-	return y;
-};
 var $elm$html$Html$Attributes$classList = function (classes) {
 	return $elm$html$Html$Attributes$class(
 		A2(
@@ -7977,6 +8069,7 @@ var $elm$json$Json$Decode$at = F2(
 		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
 	});
 var $elm$json$Json$Decode$float = _Json_decodeFloat;
+var $elm$json$Json$Decode$map4 = _Json_map4;
 var $norpan$elm_html5_drag_drop$Html5$DragDrop$positionDecoder = A5(
 	$elm$json$Json$Decode$map4,
 	$norpan$elm_html5_drag_drop$Html5$DragDrop$Position,

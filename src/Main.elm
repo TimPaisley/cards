@@ -1,7 +1,7 @@
 port module Main exposing (Model, Msg(..), emptyModel, init, main, setStorage, update, updateWithStorage, view, viewCard, viewHero, viewQueue, viewTeam)
 
 import Browser
-import Cards exposing (Card, getCard)
+import Cards exposing (Card, decodeCard, encodeCard, getCard)
 import Enemies exposing (Enemy, getEnemy)
 import Html exposing (Html, button, div, p, text)
 import Html.Attributes exposing (class, classList, style)
@@ -442,30 +442,20 @@ encodePhase phase =
     case phase of
         Introduction ->
             Encode.object
-                [ ( "name", Encode.string "introduction" )
+                [ ( "name", Encode.string "Introduction" )
                 ]
 
         Build queue ->
             Encode.object
-                [ ( "name", Encode.string "build" )
+                [ ( "name", Encode.string "Build" )
                 , ( "queue", Encode.list encodeCard queue )
                 ]
 
         Battle enemy ->
             Encode.object
-                [ ( "name", Encode.string "battle" )
+                [ ( "name", Encode.string "Battle" )
                 , ( "enemy", encodeEnemy enemy )
                 ]
-
-
-encodeCard : Card -> Encode.Value
-encodeCard card =
-    Encode.object
-        [ ( "name", Encode.string card.name )
-        , ( "attack", Encode.int card.attack )
-        , ( "energy", Encode.int card.energy )
-        , ( "clock", Encode.int card.clock )
-        ]
 
 
 encodeEnemy : Enemy -> Encode.Value
@@ -501,38 +491,20 @@ decodeTeam =
         |> Decode.list
 
 
-decodeCard : Decode.Decoder Card
-decodeCard =
-    Decode.map4 Card
-        (Decode.field "name" Decode.string)
-        (Decode.field "attack" Decode.int)
-        (Decode.field "energy" Decode.int)
-        (Decode.field "clock" Decode.int)
-
-
-decodeEnemy : Decode.Decoder Enemy
-decodeEnemy =
-    Decode.map4 Enemy
-        (Decode.field "name" Decode.string)
-        (Decode.field "attack" Decode.int)
-        (Decode.field "energy" Decode.int)
-        (Decode.field "health" Decode.int)
-
-
 decodePhase : Decode.Decoder Phase
 decodePhase =
     let
         decodePhaseAssociations phase =
             case phase of
-                "introduction" ->
+                "Introduction" ->
                     Decode.succeed Introduction
 
-                "build" ->
+                "Build" ->
                     Decode.field "queue" (Decode.list Decode.int)
                         |> Decode.map (List.map getCard)
                         |> Decode.map Build
 
-                "battle" ->
+                "Battle" ->
                     Decode.field "enemy" Decode.int
                         |> Decode.map getEnemy
                         |> Decode.map Battle
